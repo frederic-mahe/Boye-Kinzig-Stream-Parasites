@@ -6,8 +6,8 @@ strategies.
 to do:
 
 - [x] start the project,
-- [ ] create folders,
-- [ ] clone,
+- [x] create folders,
+- [x] clone,
 - [ ] normalize (rarefy),
 - [ ] potential duplicates,
 - [ ] alpha diversity (multiple conditions),
