@@ -1,5 +1,5 @@
 ---
-title: " Boyer Kinzig Stream Parasites "
+title: " Boye Kinzig Stream Parasites "
 author: "Annemie Doliwa and Frédéric Mahé"
 date: '`r format(Sys.time(), "%d %B %Y")`'
 
