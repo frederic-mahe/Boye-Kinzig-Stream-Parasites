@@ -1,4 +1,4 @@
-# 18S V9 Metabarcoding data for rivers Boyer and Kinzig, Germany
+# 18S V9 Metabarcoding data for rivers Boye and Kinzig, Germany
 
 A CRC study on two river systems under different stresses and management
 strategies.
