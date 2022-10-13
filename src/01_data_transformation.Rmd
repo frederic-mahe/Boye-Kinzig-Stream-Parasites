@@ -31,6 +31,7 @@ library(readxl)
 ```{r}
 input <- "full_table_Boye21_AD_OpenRefine05.10..xlsx"
 output <- str_replace(input, "..xlsx", "_reduced_taxonomy.tsv")
+annotated_table <- str_replace(output, ".tsv", ".xlsx")
 ```
 
 
@@ -47,6 +48,25 @@ here::here("data", input) %>%
         distinct() %>%
         write_tsv(here::here("data", output))
 ```
+
+
+## extract a list of parasitic taxa
+
+Annemie and Micah have annotate the table.
+
+```{r}
+here::here("data", annotated_table) %>%
+    readxl::read_xlsx(skip = 1) %>%
+        select(ParasiticTax) %>%
+        filter(! is.na(ParasiticTax)) %>%
+        distinct() %>%
+        pull() -> known_parasites
+
+known_parasites
+```
+
+There are `r length(known_parasites)` taxa marked at parasites, at
+different taxonomic levels.
 
 
 ***
