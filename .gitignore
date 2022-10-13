@@ -1,4 +1,9 @@
 *~
+*#
+*.csv
+*.md
+*.html
+*.xlsx
 
 # History files
 .Rhistory
