@@ -38,6 +38,7 @@ metadata_file <- "SFB_BasicData_Classification_Boye & Kinzig_2022-02-06_BoyeOnly
 output <- str_replace(input, "..xlsx", "_reduced_taxonomy.tsv")
 annotated_table <- str_replace(output, ".tsv", ".xlsx")
 eukaryotic_rarefied_file <- str_replace(input, "..xlsx", "_eukaryotic_rarefied.tsv")
+parasitic_rarefied_file <- str_replace(input, "..xlsx", "_parasitic_rarefied.tsv")
 seed <- 123
 n_subsamplings <- 100
 cbPalette <- c("#000000", "#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
@@ -244,12 +245,6 @@ eukaryotic_table %>%
     select(seqid) -> OTU_ids
 ```
 
-Clean up:
-
-```{r}
-rm(eukaryotic_table)
-```
-
 
 ### randomly subsample the table
 
@@ -268,8 +263,10 @@ for (i in 2:n_subsamplings) {
 
 matrix1 / n_subsamplings -> eukaryotic_table_transposed_rarefied
 
-rm(i, n_subsamplings, matrix1, eukaryotic_table_transposed)
+rm(i, matrix1, eukaryotic_table_transposed)
 ```
+
+That step can take several minutes.
 
 
 ### rebuild and save the rarefied table
@@ -316,7 +313,7 @@ rm(eukaryotic_rarefied_file, OTU_ids)
 ```
 
 
-## NMDS (locality)
+## NMDS
 
 ### computation
 
@@ -444,6 +441,274 @@ Clean up:
 rm(nmds_plot, occurrences_t.bray.nmds, samples, stress,
    stress_annotation, nmds_title, x_min, x_max, y_max)
 ```
+
+
+# Parasites
+
+- start from the `eukaryotic_table`,
+- keep only parasitic taxa,
+- rarefaction,
+- NMDS plots
+
+## filtering
+
+For each column whose name starts with taxonomy, for each taxa name in
+these columns, discard the probability value, then check if that taxa
+name is present in the list of known parasites:
+
+```{r}
+eukaryotic_table %>%
+    filter(if_any(starts_with("taxonomy"),
+                  ~ str_remove(., " *\\([0-9]+\\)") %in% known_parasites)) -> parasitic_table
+
+rm(eukaryotic_table)
+```
+
+
+## list supergroups
+
+```{r}
+parasitic_table %>%
+    rename(supergroup = `taxonomy 2`) %>%
+    mutate(supergroup = str_remove(supergroup, " *\\([0-9]+\\)")) %>%
+    select(-seqid, -starts_with("taxonomy")) %>%
+    rowwise() %>%
+    mutate(reads = sum(c_across(-supergroup)), .keep = "unused") %>%
+    ungroup() %>%
+    count(supergroup, wt = reads, name = "reads", sort = TRUE) %>%
+    mutate(percentage = 100 * reads / sum(reads),
+           cumulative_perc = cumsum(percentage))
+```
+
+This parasitic dataset is dominated by Rhizaria, Stramenopiles, and
+Opisthokonta.
+
+
+## find smallest sample
+
+```{r}
+parasitic_table %>%
+    select(-seqid, -starts_with("taxonomy")) %>%
+    pivot_longer(cols = everything(),
+                 names_to = "samples",
+                 values_to = "reads") %>%
+    count(samples, wt = reads, name = "reads", sort = TRUE) %>%
+    tail(n = 1) %>%
+    pull(reads) -> smallest_sample
+```
+
+
+## rarefaction (random subsampling)
+
+### make a transposed table
+
+Remove columns that are not samples:
+
+```{r}
+parasitic_table %>%
+    select(-seqid, -starts_with("taxonomy")) %>%
+    t() -> parasitic_table_transposed
+
+parasitic_table %>%
+    select(seqid) -> OTU_ids
+```
+
+
+### randomly subsample the table
+
+Randomly subsample the table, so all samples have the same number of
+reads. Repeat the process `r n_subsamplings` times to make sure that
+the final profile is as close as possible to the initial
+distribution. Use a fix seed to make the process 100% repeatable. That
+step can take several minutes to run.
+
+```{r}
+set.seed(seed)
+matrix1 <- vegan::rrarefy(parasitic_table_transposed, smallest_sample)
+for (i in 2:n_subsamplings) {
+    matrix1 <- matrix1 + vegan::rrarefy(parasitic_table_transposed, smallest_sample)
+}
+
+matrix1 / n_subsamplings -> parasitic_table_transposed_rarefied
+
+rm(i, matrix1, parasitic_table_transposed)
+```
+
+That step can take several minutes.
+
+
+### rebuild and save the rarefied table
+
+Rarefaction is computationally expensive, so the rarefied table should
+be saved:
+
+```{r}
+OTU_ids %>%
+    bind_cols(parasitic_table_transposed_rarefied %>%
+              transpose_back_to_tibble) %>%
+    remove_empty_OTUs -> parasitic_table_rarefied
+
+parasitic_table_rarefied %>%
+    write_tsv(file = here::here("data", parasitic_rarefied_file))
+```
+
+Note that there are no empty OTUs after rarefaction.
+
+
+### sanity check
+
+How many reads per sample in the final table?
+
+```{r}
+parasitic_table_rarefied %>%
+    pivot_longer(cols = -seqid,
+                 names_to = "samples",
+                 values_to = "reads") %>%
+    count(samples, wt = reads, name = "reads") %>%
+    select(reads) %>%
+    summary()
+```
+
+As expected, there are now
+`r prettyNum(smallest_sample, scientific=FALSE, big.mark=",")`
+ reads in all samples.
+
+
+Clean up:
+
+```{r}
+rm(parasitic_rarefied_file, OTU_ids)
+```
+
+
+## NMDS
+
+### computation
+
+Dissimilarity (Bray-Curtis) and ordination (NMDS):
+
+```{r}
+set.seed(seed)
+
+parasitic_table_transposed_rarefied %>%
+    vegan::vegdist(., method = "bray") %>%
+    vegan::metaMDS(.) -> occurrences_t.bray.nmds
+```
+
+
+### prepare results
+
+extract data scores and add stress value:
+
+```{r}
+stress <- occurrences_t.bray.nmds$stress
+samples <- rownames(parasitic_table_transposed_rarefied)
+data.scores <- as.data.frame(vegan::scores(occurrences_t.bray.nmds,
+                                           display = "sites"))
+data.scores$samples <- rownames(data.scores)
+
+x_min <- min(data.scores$NMDS1)
+x_max <- max(data.scores$NMDS1)
+y_max <- max(data.scores$NMDS2)
+stress_annotation <- paste("stress: ", round(stress, digits = 4), sep = "")
+```
+
+parse sample names and join metadata:
+
+```{r}
+data.scores %>%
+    separate(col = samples,
+             into = c("locality", NA),
+             sep = 3,
+             remove = FALSE) %>%
+    separate(col = samples,
+             into = c("site_name", "replicate"),
+             sep = "_",
+             remove = FALSE) %>%
+    left_join(metadata, by = "site_name") -> ordination_coordinates
+```
+
+Clean up:
+
+```{r}
+rm(data.scores, parasitic_table_transposed_rarefied)
+```
+
+
+### variables and functions
+
+```{r}
+reds <- RColorBrewer::brewer.pal(6, "Reds")
+nmds_title <- "Boye Kinzig rivers 18S V9 (parasites, Bray-Curtis)"
+
+list(
+    geom_point(size = 6, shape = 21, colour = "black", stroke = 0.5),
+    theme_bw(base_size = 16),
+    annotate("text", x = x_max - abs(x_max / 4),
+             y = y_max, label = stress_annotation),
+    ggtitle(nmds_title)
+) -> my_NMDS_theme
+
+
+plot_per_parameter <- function(parameter_name, legend_title) {
+
+    legend_title %>%
+        str_remove("_CRC_class") %>%
+        str_replace_all("_", "\n") -> new_legend
+
+    ggplot(data = ordination_coordinates,
+           aes(x = NMDS1, y = NMDS2, fill = parameter_name)) +
+        my_NMDS_theme +
+        scale_fill_manual(name = new_legend, values = reds) +
+        scale_colour_manual(values = reds)
+}
+```
+
+
+### plot (locality)
+
+```{r}
+ggplot(data = ordination_coordinates,
+       aes(x = NMDS1, y = NMDS2, fill = locality)) +
+    my_NMDS_theme +
+    scale_fill_manual(values = cbPalette) +
+    scale_colour_manual(values = cbPalette) -> nmds_plot
+
+nmds_plot
+```
+
+No obvious structuration.
+
+Add ellipses representing t-distributions (solid lines) and normal
+distributions (dashed lines):
+
+```{r}
+nmds_plot +
+    stat_ellipse(aes(colour = locality), type = "norm", linetype = 2) +
+    stat_ellipse(aes(colour = locality), type = "t", linetype = 1)
+```
+
+The t-distribution, also known as Student's t-distribution, is a type
+of normal distribution used for smaller sample sizes, where the
+variance in the data is unknown.
+
+
+### plot (all qualitative parameters)
+
+```{r}
+ordination_coordinates %>%
+    select(where(is.factor)) %>%
+    map2(.y = names(.),
+         ~ plot_per_parameter(.x, .y))
+```
+
+Clean up:
+
+```{r}
+rm(nmds_plot, occurrences_t.bray.nmds, samples, stress,
+   stress_annotation, nmds_title, x_min, x_max, y_max)
+```
+
 
 
 ***
