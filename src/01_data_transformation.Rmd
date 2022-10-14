@@ -26,12 +26,24 @@ library(tidyverse)
 library(readxl)
 ```
 
-#### variables and functions
+# preliminary steps
+
+### variables and functions
 
 ```{r}
 input <- "full_table_Boye21_AD_OpenRefine05.10..xlsx"
 output <- str_replace(input, "..xlsx", "_reduced_taxonomy.tsv")
 annotated_table <- str_replace(output, ".tsv", ".xlsx")
+```
+
+```{r}
+load_raw_occurrence_data <- function(filename){
+    here::here("data", filename) %>%
+        readxl::read_xlsx(na = c("", "NA")) %>%
+            select(-sequences) %>%
+            mutate(across(.cols = -c(seqid, starts_with("taxonomy")),
+                          .fns = as.numeric))
+}
 ```
 
 
@@ -40,9 +52,8 @@ annotated_table <- str_replace(output, ".tsv", ".xlsx")
 That shorter list will then be annotated to identify parasitic taxa.
 
 ```{r}
-here::here("data", input) %>%
-    readxl::read_xlsx() %>%
-        select(starts_with("Taxonomy")) %>%
+load_raw_occurrence_data(input) %>%
+        select(starts_with("taxonomy")) %>%
         mutate(across(everything(), ~ str_remove(., " *\\([0-9]+\\)"))) %>%
         arrange(across(everything())) %>%
         distinct() %>%
@@ -67,6 +78,86 @@ known_parasites
 
 There are `r length(known_parasites)` taxa marked at parasites, at
 different taxonomic levels.
+
+
+## checks and filtering
+
+here we go!
+
+```{r}
+load_raw_occurrence_data(input) -> raw_table
+```
+
+how many reads per sample?
+
+```{r}
+raw_table %>%
+    select(-starts_with("taxonomy")) %>%
+    pivot_longer(cols = -seqid,
+                 names_to = "samples",
+                 values_to = "reads") %>%
+    count(samples, wt = reads, name = "reads") %>%
+    summary(reads)
+```
+
+how many reads per domain?
+
+```{r}
+taxonomy_columns_to_discard <- paste(c("taxonomy"), 2:8, sep = " ")
+
+raw_table %>%
+    select(-taxonomy_columns_to_discard) %>%
+    rename(domain = `taxonomy 1`) %>%
+    mutate(domain = str_remove(domain, " *\\([0-9]+\\)")) %>%
+    pivot_longer(cols = -c(seqid, domain),
+                 names_to = "samples",
+                 values_to = "reads") %>%
+    count(domain, wt = reads, name = "reads") %>%
+    mutate(percentage = 100 * reads / sum(reads))
+
+rm(taxonomy_columns_to_discard)
+```
+
+Note that there are no unassigned reads, which is a bit surprising,
+even for 18S V9 reads. It is safe to exclude all reads assigned to
+Bacteria.
+
+
+# Eukaryots
+
+Exclude bacteria:
+
+
+```{r}
+raw_table %>%
+    filter(str_detect(`taxonomy 1`, "Bacteria", negate = TRUE)) -> eukaryotic_table
+
+rm(raw_table)
+```
+
+
+## list supergroups
+
+```{r}
+eukaryotic_table %>%
+    rename(supergroup = `taxonomy 2`) %>%
+    mutate(supergroup = str_remove(supergroup, " *\\([0-9]+\\)")) %>%
+    select(-seqid, -starts_with("taxonomy")) %>%
+    rowwise() %>%
+    mutate(reads = sum(c_across(-supergroup)), .keep = "unused") %>%
+    ungroup() %>%
+    count(supergroup, wt = reads, name = "reads", sort = TRUE) %>%
+    mutate(percentage = 100 * reads / sum(reads),
+           cumulative_perc = cumsum(percentage))
+```
+
+The dataset is dominated by Opisthokonta, Stramenopiles and
+Archaeplastida.
+
+
+## rarefy and NMDS
+
+To be done.
 
 
 ***
