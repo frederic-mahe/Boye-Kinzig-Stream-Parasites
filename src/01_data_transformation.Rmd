@@ -24,6 +24,7 @@ knitr::opts_chunk$set(echo = TRUE)
 library(here)
 library(tidyverse)
 library(readxl)
+library(vegan)
 ```
 
 # preliminary steps
@@ -34,6 +35,10 @@ library(readxl)
 input <- "full_table_Boye21_AD_OpenRefine05.10..xlsx"
 output <- str_replace(input, "..xlsx", "_reduced_taxonomy.tsv")
 annotated_table <- str_replace(output, ".tsv", ".xlsx")
+eukaryotic_rarefied_file <- str_replace(input, "..xlsx", "_eukaryotic_rarefied.tsv")
+seed <- 123
+n_subsamplings <- 100
+cbPalette <- c("#000000", "#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
 ```
 
 ```{r}
@@ -97,7 +102,15 @@ raw_table %>%
                  names_to = "samples",
                  values_to = "reads") %>%
     count(samples, wt = reads, name = "reads") %>%
-    summary(reads)
+    pull(reads) -> sample_sizes
+
+sample_sizes %>%
+    summary()
+
+sample_sizes %>%
+    min() -> smallest_sample
+
+rm(sample_sizes)
 ```
 
 how many reads per domain?
@@ -155,9 +168,200 @@ The dataset is dominated by Opisthokonta, Stramenopiles and
 Archaeplastida.
 
 
-## rarefy and NMDS
+## rarefaction (random subsampling)
 
-To be done.
+### local functions
+
+Prepare to remove empty OTUs from the final rarefied table:
+
+```{r}
+. %>%
+    t() %>%
+    as.data.frame() %>%
+    as_tibble() -> transpose_back_to_tibble
+
+. %>%
+    rowwise() %>%
+    mutate(reads = sum(c_across(-seqid)), .keep = "all") %>%
+    ungroup() %>%
+    filter(reads > 0) %>%
+    select(-reads) -> remove_empty_OTUs
+```
+
+
+### make a transposed table
+
+Remove columns that are not samples:
+
+```{r}
+eukaryotic_table %>%
+    select(-seqid, -starts_with("taxonomy")) %>%
+    t() -> eukaryotic_table_transposed
+
+eukaryotic_table %>%
+    select(seqid) -> OTU_ids
+```
+
+Clean up:
+
+```{r}
+rm(eukaryotic_table)
+```
+
+
+### randomly subsample the table
+
+Randomly subsample the table, so all samples have the same number of
+reads. Repeat the process `r n_subsamplings` times to make sure that
+the final profile is as close as possible to the initial
+distribution. Use a fix seed to make the process 100% repeatable. That
+step can take several minutes to run.
+
+```{r}
+set.seed(seed)
+matrix1 <- vegan::rrarefy(eukaryotic_table_transposed, smallest_sample)
+for (i in 2:n_subsamplings) {
+    matrix1 <- matrix1 + vegan::rrarefy(eukaryotic_table_transposed, smallest_sample)
+}
+
+matrix1 / n_subsamplings -> eukaryotic_table_transposed_rarefied
+
+rm(i, n_subsamplings, matrix1, eukaryotic_table_transposed)
+```
+
+
+### rebuild and save the rarefied table
+
+Rarefaction is computationally expensive, so the rarefied table should
+be saved:
+
+```{r}
+OTU_ids %>%
+    bind_cols(eukaryotic_table_transposed_rarefied %>%
+              transpose_back_to_tibble) %>%
+    remove_empty_OTUs -> eukaryotic_table_rarefied
+
+eukaryotic_table_rarefied %>%
+    write_tsv(file = here::here("data", eukaryotic_rarefied_file))
+```
+
+Note that there are no empty OTUs after rarefaction.
+
+
+### sanity check
+
+How many reads per sample in the final table?
+
+```{r}
+eukaryotic_table_rarefied %>%
+    pivot_longer(cols = -seqid,
+                 names_to = "samples",
+                 values_to = "reads") %>%
+    count(samples, wt = reads, name = "reads") %>%
+    select(reads) %>%
+    summary()
+```
+
+As expected, there are now
+`r prettyNum(smallest_sample, scientific=FALSE, big.mark=",")`
+ reads in all samples.
+
+
+Clean up:
+
+```{r}
+rm(eukaryotic_rarefied_file, OTU_ids)
+```
+
+
+## NMDS (locality)
+
+### computation
+
+Dissimilarity (Bray-Curtis) and ordination (NMDS):
+
+```{r}
+set.seed(seed)
+
+eukaryotic_table_transposed_rarefied %>%
+    vegan::vegdist(., method = "bray") %>%
+    vegan::metaMDS(.) -> occurrences_t.bray.nmds
+```
+
+
+### prepare results
+
+extract data scores and add stress value:
+
+```{r}
+stress <- occurrences_t.bray.nmds$stress
+samples <- rownames(eukaryotic_table_transposed_rarefied)
+data.scores <- as.data.frame(vegan::scores(occurrences_t.bray.nmds,
+                                           display = "sites"))
+data.scores$samples <- rownames(data.scores)
+
+x_min <- min(data.scores$NMDS1)
+x_max <- max(data.scores$NMDS1)
+y_max <- max(data.scores$NMDS2)
+stress_annotation <- paste("stress: ", round(stress, digits = 4), sep = "")
+```
+
+parse sample names:
+
+```{r}
+data.scores %>%
+    separate(col = samples,
+             into = c("locality", NA),
+             sep = 3) -> ordination_coordinates
+```
+
+Clean up:
+
+```{r}
+rm(data.scores, eukaryotic_table_transposed_rarefied)
+```
+
+
+### plot
+
+```{r}
+title <- "Boye Kinzig rivers 18S V9 all eukaryots NMDS"
+
+ggplot(data = ordination_coordinates,
+       aes(x = NMDS1, y = NMDS2, fill = locality)) +
+    scale_fill_manual(values = cbPalette) +
+    scale_colour_manual(values = cbPalette) +
+    geom_point(size = 6, shape = 21, colour = "black", stroke = 0.5) +
+    theme_bw(base_size = 16) +
+    ggtitle(title) +
+    annotate("text", x = x_max - abs(x_max / 4),
+             y = y_max, label = stress_annotation) -> nmds_plot
+
+nmds_plot
+```
+
+No obvious structuration.
+
+Add ellipses representing t-distributions (solid lines) and normal
+distributions (dashed lines):
+
+```{r}
+nmds_plot +
+    stat_ellipse(aes(colour = locality), type = "norm", linetype = 2) +
+    stat_ellipse(aes(colour = locality), type = "t", linetype = 1)
+```
+
+The t-distribution, also known as Student's t-distribution, is a type
+of normal distribution used for smaller sample sizes, where the
+variance in the data is unknown.
+
+
+Clean up:
+
+```{r}
+rm(nmds_plot, occurrences_t.bray.nmds, samples, stress,
+   stress_annotation, title, x_min, x_max, y_max)
+```
 
 
 ***
