@@ -3,12 +3,10 @@
 A CRC study on two river systems under different stresses and management
 strategies.
 
-to do:
-
 - [x] start the project,
 - [x] create folders,
 - [x] clone,
-- [ ] normalize (rarefy),
-- [ ] potential duplicates,
+- [x] normalize (rarefy),
+- [x] potential duplicates,
 - [ ] alpha diversity (multiple conditions),
-- [ ] beta diversity
+- [x] beta diversity
