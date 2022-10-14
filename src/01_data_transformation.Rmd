@@ -25,6 +25,7 @@ library(here)
 library(tidyverse)
 library(readxl)
 library(vegan)
+library(RColorBrewer)
 ```
 
 # preliminary steps
@@ -33,6 +34,7 @@ library(vegan)
 
 ```{r}
 input <- "full_table_Boye21_AD_OpenRefine05.10..xlsx"
+metadata_file <- "SFB_BasicData_Classification_Boye & Kinzig_2022-02-06_BoyeOnly.xlsx"
 output <- str_replace(input, "..xlsx", "_reduced_taxonomy.tsv")
 annotated_table <- str_replace(output, ".tsv", ".xlsx")
 eukaryotic_rarefied_file <- str_replace(input, "..xlsx", "_eukaryotic_rarefied.tsv")
@@ -49,6 +51,46 @@ load_raw_occurrence_data <- function(filename){
             mutate(across(.cols = -c(seqid, starts_with("taxonomy")),
                           .fns = as.numeric))
 }
+
+extract_and_format_metadata <- function(filename){
+    here::here("data", filename) %>%
+        readxl::read_xlsx(skip = 2, n_max = 22) %>%
+            slice(3:23) %>%
+            rename(site_name = characteristics,
+                   stream_name = `...2`,
+                   years_since_restauration = `...4`,
+                   GSG_CRC_class = `...7`,
+                   years_since_sewage = `...9`,
+                   years_since_sewage_class = `...10`,
+                   years_since_sewage_CRC_class = `...11`,
+                   conductivity_CRC_class = `...13`,
+                   dissolved_oxygen = `dissolved oxygen`,
+                   dissolved_oxygen_CRC_class = `...15`,
+                   sulfate = `sulfate NEW`,
+                   sulfate_CRC_class = `...17`,
+                   nitrate_CRC_class = `...19`,
+                   overall_mean = `overall\r\nmean`) %>%
+            select(-c(`...5`, DOC, `...21`, `...23`)) %>%
+            mutate(across(everything(), ~ str_replace(., ".* (not assessed|never sewer) .*", "NA")),
+                   across(everything(), ~ na_if(., "NA")),
+                   years_since_sewage_class = str_remove(years_since_sewage_class, " *[Yy]ears?"),
+                   restoration = str_replace(restoration, ".* reference .*", "-Inf"),
+                   sewagefree = replace_na(sewagefree, -Inf),
+                   years_since_restauration = replace_na(years_since_restauration, Inf),
+                   years_since_sewage = replace_na(years_since_sewage, Inf),
+                   across(c(ends_with("_class"), GSG), ~ as.factor(.)),
+                   across(c(where(is.character), -ends_with("_name")), ~ as.numeric(.)))
+}
+```
+
+
+## extract metadata
+
+The metadata table is formatted for human readers, not for R. Some leg
+work is required to make the metadata usable.
+
+```{r}
+extract_and_format_metadata(metadata_file) -> metadata
 ```
 
 
@@ -136,7 +178,7 @@ even for 18S V9 reads. It is safe to exclude all reads assigned to
 Bacteria.
 
 
-# Eukaryots
+# Eukaryota
 
 Exclude bacteria:
 
@@ -287,6 +329,7 @@ eukaryotic_table_transposed_rarefied %>%
     vegan::vegdist(., method = "bray") %>%
     vegan::metaMDS(.) -> occurrences_t.bray.nmds
 ```
+That step can take several minutes.
 
 
 ### prepare results
@@ -306,13 +349,19 @@ y_max <- max(data.scores$NMDS2)
 stress_annotation <- paste("stress: ", round(stress, digits = 4), sep = "")
 ```
 
-parse sample names:
+parse sample names and join metadata:
 
 ```{r}
 data.scores %>%
     separate(col = samples,
              into = c("locality", NA),
-             sep = 3) -> ordination_coordinates
+             sep = 3,
+             remove = FALSE) %>%
+    separate(col = samples,
+             into = c("site_name", "replicate"),
+             sep = "_",
+             remove = FALSE) %>%
+    left_join(metadata, by = "site_name") -> ordination_coordinates
 ```
 
 Clean up:
@@ -322,20 +371,44 @@ rm(data.scores, eukaryotic_table_transposed_rarefied)
 ```
 
 
-### plot
+### variables and functions
 
 ```{r}
-title <- "Boye Kinzig rivers 18S V9 all eukaryots NMDS"
+reds <- RColorBrewer::brewer.pal(6, "Reds")
+nmds_title <- "Boye Kinzig rivers 18S V9 (Eukaryota, Bray-Curtis)"
 
+list(
+    geom_point(size = 6, shape = 21, colour = "black", stroke = 0.5),
+    theme_bw(base_size = 16),
+    annotate("text", x = x_max - abs(x_max / 4),
+             y = y_max, label = stress_annotation),
+    ggtitle(nmds_title)
+) -> my_NMDS_theme
+
+
+plot_per_parameter <- function(parameter_name, legend_title) {
+
+    legend_title %>%
+        str_remove("_CRC_class") %>%
+        str_replace_all("_", "\n") -> new_legend
+
+    ggplot(data = ordination_coordinates,
+           aes(x = NMDS1, y = NMDS2, fill = parameter_name)) +
+        my_NMDS_theme +
+        scale_fill_manual(name = new_legend, values = reds) +
+        scale_colour_manual(values = reds)
+}
+```
+
+
+### plot (locality)
+
+```{r}
 ggplot(data = ordination_coordinates,
        aes(x = NMDS1, y = NMDS2, fill = locality)) +
+    my_NMDS_theme +
     scale_fill_manual(values = cbPalette) +
-    scale_colour_manual(values = cbPalette) +
-    geom_point(size = 6, shape = 21, colour = "black", stroke = 0.5) +
-    theme_bw(base_size = 16) +
-    ggtitle(title) +
-    annotate("text", x = x_max - abs(x_max / 4),
-             y = y_max, label = stress_annotation) -> nmds_plot
+    scale_colour_manual(values = cbPalette) -> nmds_plot
 
 nmds_plot
 ```
@@ -356,11 +429,20 @@ of normal distribution used for smaller sample sizes, where the
 variance in the data is unknown.
 
 
+### plot (all qualitative parameters)
+
+```{r}
+ordination_coordinates %>%
+    select(where(is.factor)) %>%
+    map2(.y = names(.),
+         ~ plot_per_parameter(.x, .y))
+```
+
 Clean up:
 
 ```{r}
 rm(nmds_plot, occurrences_t.bray.nmds, samples, stress,
-   stress_annotation, title, x_min, x_max, y_max)
+   stress_annotation, nmds_title, x_min, x_max, y_max)
 ```
 
 
