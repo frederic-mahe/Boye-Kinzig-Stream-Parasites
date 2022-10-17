@@ -352,6 +352,7 @@ set.seed(seed)
 eukaryotic_table_transposed_rarefied %>%
     compute_NMDS_coordinates -> occurrences_t.bray.nmds
 ```
+
 That step can take several minutes.
 
 
