@@ -671,8 +671,8 @@ data.scores %>%
 Clean up:
 
 ```{r}
-rm(nmds_plot, occurrences_t.bray.nmds, samples, stress_annotation,
-   nmds_title, x_min, x_max, y_max, data.scores)
+rm(nmds_plot, occurrences_t.bray.nmds, stress_annotation, nmds_title,
+   x_min, x_max, y_max, data.scores)
 ```
 
 
