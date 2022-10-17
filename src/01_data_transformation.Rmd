@@ -82,6 +82,18 @@ extract_and_format_metadata <- function(filename){
                    across(c(ends_with("_class"), GSG), ~ as.factor(.)),
                    across(c(where(is.character), -ends_with("_name")), ~ as.numeric(.)))
 }
+
+
+. %>%
+    rename(supergroup = `taxonomy 2`) %>%
+    mutate(supergroup = str_remove(supergroup, " *\\([0-9]+\\)")) %>%
+    select(-seqid, -starts_with("taxonomy")) %>%
+    rowwise() %>%
+    mutate(reads = sum(c_across(-supergroup)), .keep = "unused") %>%
+    ungroup() %>%
+    count(supergroup, wt = reads, name = "reads", sort = TRUE) %>%
+    mutate(percentage = 100 * reads / sum(reads),
+           cumulative_perc = cumsum(percentage)) -> list_supergroups
 ```
 
 
@@ -196,15 +208,7 @@ rm(raw_table)
 
 ```{r}
 eukaryotic_table %>%
-    rename(supergroup = `taxonomy 2`) %>%
-    mutate(supergroup = str_remove(supergroup, " *\\([0-9]+\\)")) %>%
-    select(-seqid, -starts_with("taxonomy")) %>%
-    rowwise() %>%
-    mutate(reads = sum(c_across(-supergroup)), .keep = "unused") %>%
-    ungroup() %>%
-    count(supergroup, wt = reads, name = "reads", sort = TRUE) %>%
-    mutate(percentage = 100 * reads / sum(reads),
-           cumulative_perc = cumsum(percentage))
+    list_supergroups
 ```
 
 The dataset is dominated by Opisthokonta, Stramenopiles and
@@ -480,15 +484,7 @@ rm(eukaryotic_table)
 
 ```{r}
 parasitic_table %>%
-    rename(supergroup = `taxonomy 2`) %>%
-    mutate(supergroup = str_remove(supergroup, " *\\([0-9]+\\)")) %>%
-    select(-seqid, -starts_with("taxonomy")) %>%
-    rowwise() %>%
-    mutate(reads = sum(c_across(-supergroup)), .keep = "unused") %>%
-    ungroup() %>%
-    count(supergroup, wt = reads, name = "reads", sort = TRUE) %>%
-    mutate(percentage = 100 * reads / sum(reads),
-           cumulative_perc = cumsum(percentage))
+    list_supergroups
 ```
 
 This parasitic dataset is dominated by Rhizaria, Stramenopiles, and
