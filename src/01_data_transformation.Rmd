@@ -321,6 +321,20 @@ rm(eukaryotic_rarefied_file, OTU_ids)
 . %>%
     vegan::vegdist(., method = "bray") %>%
     vegan::metaMDS(.) -> compute_NMDS_coordinates
+
+. %>%
+    vegan::scores(., display = "sites") %>%
+    as.data.frame() %>%
+    rownames_to_column(var = "samples") %>%
+    separate(col = samples,
+             into = c("locality", NA),
+             sep = 3,
+             remove = FALSE) %>%
+    separate(col = samples,
+             into = c("site_name", "replicate"),
+             sep = "_",
+             remove = FALSE) %>%
+    left_join(metadata, by = "site_name") -> extract_NMDS_coordinates
 ```
 
 
@@ -343,18 +357,7 @@ extract data scores and add stress value:
 
 ```{r}
 occurrences_t.bray.nmds %>%
-    vegan::scores(., display = "sites") %>%
-    as.data.frame() %>%
-    rownames_to_column(var = "samples") %>%
-    separate(col = samples,
-             into = c("locality", NA),
-             sep = 3,
-             remove = FALSE) %>%
-    separate(col = samples,
-             into = c("site_name", "replicate"),
-             sep = "_",
-             remove = FALSE) %>%
-    left_join(metadata, by = "site_name") -> data.scores
+    extract_NMDS_coordinates -> data.scores
 
 x_min <- min(data.scores$NMDS1)
 x_max <- max(data.scores$NMDS1)
@@ -605,18 +608,7 @@ extract data scores and add stress value:
 
 ```{r}
 occurrences_t.bray.nmds %>%
-    vegan::scores(., display = "sites") %>%
-    as.data.frame() %>%
-    rownames_to_column(var = "samples") %>%
-    separate(col = samples,
-             into = c("locality", NA),
-             sep = 3,
-             remove = FALSE) %>%
-    separate(col = samples,
-             into = c("site_name", "replicate"),
-             sep = "_",
-             remove = FALSE) %>%
-    left_join(metadata, by = "site_name") -> data.scores
+    extract_NMDS_coordinates -> data.scores
 
 x_min <- min(data.scores$NMDS1)
 x_max <- max(data.scores$NMDS1)
