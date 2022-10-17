@@ -94,6 +94,14 @@ extract_and_format_metadata <- function(filename){
     count(supergroup, wt = reads, name = "reads", sort = TRUE) %>%
     mutate(percentage = 100 * reads / sum(reads),
            cumulative_perc = cumsum(percentage)) -> list_supergroups
+
+. %>%
+    pivot_longer(cols = -seqid,
+                 names_to = "samples",
+                 values_to = "reads") %>%
+    count(samples, wt = reads, name = "reads") %>%
+    select(reads) %>%
+    summary() -> check_sample_sizes
 ```
 
 
@@ -297,12 +305,7 @@ How many reads per sample in the final table?
 
 ```{r}
 eukaryotic_table_rarefied %>%
-    pivot_longer(cols = -seqid,
-                 names_to = "samples",
-                 values_to = "reads") %>%
-    count(samples, wt = reads, name = "reads") %>%
-    select(reads) %>%
-    summary()
+    check_sample_sizes
 ```
 
 As expected, there are now
@@ -568,12 +571,7 @@ How many reads per sample in the final table?
 
 ```{r}
 parasitic_table_rarefied %>%
-    pivot_longer(cols = -seqid,
-                 names_to = "samples",
-                 values_to = "reads") %>%
-    count(samples, wt = reads, name = "reads") %>%
-    select(reads) %>%
-    summary()
+    check_sample_sizes
 ```
 
 As expected, there are now
