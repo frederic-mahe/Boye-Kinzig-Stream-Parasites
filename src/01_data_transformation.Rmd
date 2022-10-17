@@ -334,7 +334,6 @@ That step can take several minutes.
 extract data scores and add stress value:
 
 ```{r}
-samples <- rownames(eukaryotic_table_transposed_rarefied)
 data.scores <- as.data.frame(vegan::scores(occurrences_t.bray.nmds,
                                            display = "sites"))
 data.scores$samples <- rownames(data.scores)
@@ -603,7 +602,6 @@ parasitic_table_transposed_rarefied %>%
 extract data scores and add stress value:
 
 ```{r}
-samples <- rownames(parasitic_table_transposed_rarefied)
 data.scores <- as.data.frame(vegan::scores(occurrences_t.bray.nmds,
                                            display = "sites"))
 data.scores$samples <- rownames(data.scores)
