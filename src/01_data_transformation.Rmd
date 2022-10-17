@@ -315,7 +315,7 @@ rm(eukaryotic_rarefied_file, OTU_ids)
 
 ## NMDS
 
-### variables and functions
+### local functions
 
 ```{r}
 . %>%
@@ -335,6 +335,10 @@ rm(eukaryotic_rarefied_file, OTU_ids)
              sep = "_",
              remove = FALSE) %>%
     left_join(metadata, by = "site_name") -> extract_NMDS_coordinates
+
+. %>%
+    round(., digits = 4) %>%
+    paste("stress: ", ., sep = "") -> format_stress_annotation
 ```
 
 
@@ -364,8 +368,7 @@ x_max <- max(data.scores$NMDS1)
 y_max <- max(data.scores$NMDS2)
 
 occurrences_t.bray.nmds$stress %>%
-    round(., digits = 4) %>%
-    paste("stress: ", ., sep = "") -> stress_annotation
+    format_stress_annotation -> stress_annotation
 ```
 
 Clean up:
@@ -615,8 +618,7 @@ x_max <- max(data.scores$NMDS1)
 y_max <- max(data.scores$NMDS2)
 
 occurrences_t.bray.nmds$stress %>%
-    round(., digits = 4) %>%
-    paste("stress: ", ., sep = "") -> stress_annotation
+    format_stress_annotation -> stress_annotation
 ```
 
 Clean up:
