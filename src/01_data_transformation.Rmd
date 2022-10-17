@@ -83,7 +83,6 @@ extract_and_format_metadata <- function(filename){
                    across(c(where(is.character), -ends_with("_name")), ~ as.numeric(.)))
 }
 
-
 . %>%
     rename(supergroup = `taxonomy 2`) %>%
     mutate(supergroup = str_remove(supergroup, " *\\([0-9]+\\)")) %>%
