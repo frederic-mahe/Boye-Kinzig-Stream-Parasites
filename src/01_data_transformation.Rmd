@@ -315,6 +315,15 @@ rm(eukaryotic_rarefied_file, OTU_ids)
 
 ## NMDS
 
+### variables and functions
+
+```{r}
+. %>%
+    vegan::vegdist(., method = "bray") %>%
+    vegan::metaMDS(.) -> compute_NMDS_coordinates
+```
+
+
 ### computation
 
 Dissimilarity (Bray-Curtis) and ordination (NMDS):
@@ -323,8 +332,7 @@ Dissimilarity (Bray-Curtis) and ordination (NMDS):
 set.seed(seed)
 
 eukaryotic_table_transposed_rarefied %>%
-    vegan::vegdist(., method = "bray") %>%
-    vegan::metaMDS(.) -> occurrences_t.bray.nmds
+    compute_NMDS_coordinates -> occurrences_t.bray.nmds
 ```
 That step can take several minutes.
 
@@ -587,8 +595,7 @@ Dissimilarity (Bray-Curtis) and ordination (NMDS):
 set.seed(seed)
 
 parasitic_table_transposed_rarefied %>%
-    vegan::vegdist(., method = "bray") %>%
-    vegan::metaMDS(.) -> occurrences_t.bray.nmds
+    compute_NMDS_coordinates -> occurrences_t.bray.nmds
 ```
 
 
