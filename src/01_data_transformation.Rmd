@@ -334,9 +334,19 @@ That step can take several minutes.
 extract data scores and add stress value:
 
 ```{r}
-data.scores <- as.data.frame(vegan::scores(occurrences_t.bray.nmds,
-                                           display = "sites"))
-data.scores$samples <- rownames(data.scores)
+occurrences_t.bray.nmds %>%
+    vegan::scores(., display = "sites") %>%
+    as.data.frame() %>%
+    rownames_to_column(var = "samples") %>%
+    separate(col = samples,
+             into = c("locality", NA),
+             sep = 3,
+             remove = FALSE) %>%
+    separate(col = samples,
+             into = c("site_name", "replicate"),
+             sep = "_",
+             remove = FALSE) %>%
+    left_join(metadata, by = "site_name") -> data.scores
 
 x_min <- min(data.scores$NMDS1)
 x_max <- max(data.scores$NMDS1)
@@ -347,25 +357,10 @@ occurrences_t.bray.nmds$stress %>%
     paste("stress: ", ., sep = "") -> stress_annotation
 ```
 
-parse sample names and join metadata:
-
-```{r}
-data.scores %>%
-    separate(col = samples,
-             into = c("locality", NA),
-             sep = 3,
-             remove = FALSE) %>%
-    separate(col = samples,
-             into = c("site_name", "replicate"),
-             sep = "_",
-             remove = FALSE) %>%
-    left_join(metadata, by = "site_name") -> ordination_coordinates
-```
-
 Clean up:
 
 ```{r}
-rm(data.scores, eukaryotic_table_transposed_rarefied)
+rm(eukaryotic_table_transposed_rarefied)
 ```
 
 
@@ -390,7 +385,7 @@ plot_per_parameter <- function(parameter_name, legend_title) {
         str_remove("_CRC_class") %>%
         str_replace_all("_", "\n") -> new_legend
 
-    ggplot(data = ordination_coordinates,
+    ggplot(data = data.scores,
            aes(x = NMDS1, y = NMDS2, fill = parameter_name)) +
         my_NMDS_theme +
         scale_fill_manual(name = new_legend, values = reds) +
@@ -402,7 +397,7 @@ plot_per_parameter <- function(parameter_name, legend_title) {
 ### plot (locality)
 
 ```{r}
-ggplot(data = ordination_coordinates,
+ggplot(data = data.scores,
        aes(x = NMDS1, y = NMDS2, fill = locality)) +
     my_NMDS_theme +
     scale_fill_manual(values = cbPalette) +
@@ -430,7 +425,7 @@ variance in the data is unknown.
 ### plot (all qualitative parameters)
 
 ```{r}
-ordination_coordinates %>%
+data.scores %>%
     select(where(is.factor)) %>%
     map2(.y = names(.),
          ~ plot_per_parameter(.x, .y))
@@ -440,7 +435,7 @@ Clean up:
 
 ```{r}
 rm(nmds_plot, occurrences_t.bray.nmds, samples, stress_annotation,
-   nmds_title, x_min, x_max, y_max)
+   nmds_title, x_min, x_max, y_max, data.scores)
 ```
 
 
@@ -602,9 +597,19 @@ parasitic_table_transposed_rarefied %>%
 extract data scores and add stress value:
 
 ```{r}
-data.scores <- as.data.frame(vegan::scores(occurrences_t.bray.nmds,
-                                           display = "sites"))
-data.scores$samples <- rownames(data.scores)
+occurrences_t.bray.nmds %>%
+    vegan::scores(., display = "sites") %>%
+    as.data.frame() %>%
+    rownames_to_column(var = "samples") %>%
+    separate(col = samples,
+             into = c("locality", NA),
+             sep = 3,
+             remove = FALSE) %>%
+    separate(col = samples,
+             into = c("site_name", "replicate"),
+             sep = "_",
+             remove = FALSE) %>%
+    left_join(metadata, by = "site_name") -> data.scores
 
 x_min <- min(data.scores$NMDS1)
 x_max <- max(data.scores$NMDS1)
@@ -615,25 +620,10 @@ occurrences_t.bray.nmds$stress %>%
     paste("stress: ", ., sep = "") -> stress_annotation
 ```
 
-parse sample names and join metadata:
-
-```{r}
-data.scores %>%
-    separate(col = samples,
-             into = c("locality", NA),
-             sep = 3,
-             remove = FALSE) %>%
-    separate(col = samples,
-             into = c("site_name", "replicate"),
-             sep = "_",
-             remove = FALSE) %>%
-    left_join(metadata, by = "site_name") -> ordination_coordinates
-```
-
 Clean up:
 
 ```{r}
-rm(data.scores, parasitic_table_transposed_rarefied)
+rm(parasitic_table_transposed_rarefied)
 ```
 
 
@@ -658,7 +648,7 @@ plot_per_parameter <- function(parameter_name, legend_title) {
         str_remove("_CRC_class") %>%
         str_replace_all("_", "\n") -> new_legend
 
-    ggplot(data = ordination_coordinates,
+    ggplot(data = data.scores,
            aes(x = NMDS1, y = NMDS2, fill = parameter_name)) +
         my_NMDS_theme +
         scale_fill_manual(name = new_legend, values = reds) +
@@ -670,7 +660,7 @@ plot_per_parameter <- function(parameter_name, legend_title) {
 ### plot (locality)
 
 ```{r}
-ggplot(data = ordination_coordinates,
+ggplot(data = data.scores,
        aes(x = NMDS1, y = NMDS2, fill = locality)) +
     my_NMDS_theme +
     scale_fill_manual(values = cbPalette) +
@@ -698,7 +688,7 @@ variance in the data is unknown.
 ### plot (all qualitative parameters)
 
 ```{r}
-ordination_coordinates %>%
+data.scores %>%
     select(where(is.factor)) %>%
     map2(.y = names(.),
          ~ plot_per_parameter(.x, .y))
@@ -708,7 +698,7 @@ Clean up:
 
 ```{r}
 rm(nmds_plot, occurrences_t.bray.nmds, samples, stress_annotation,
-   nmds_title, x_min, x_max, y_max)
+   nmds_title, x_min, x_max, y_max, data.scores)
 ```
 
 
