@@ -632,28 +632,6 @@ rm(parasitic_table_transposed_rarefied)
 ```{r}
 reds <- RColorBrewer::brewer.pal(6, "Reds")
 nmds_title <- "Boye Kinzig rivers 18S V9 (parasites, Bray-Curtis)"
-
-list(
-    geom_point(size = 6, shape = 21, colour = "black", stroke = 0.5),
-    theme_bw(base_size = 16),
-    annotate("text", x = x_max - abs(x_max / 4),
-             y = y_max, label = stress_annotation),
-    ggtitle(nmds_title)
-) -> my_NMDS_theme
-
-
-plot_per_parameter <- function(parameter_name, legend_title) {
-
-    legend_title %>%
-        str_remove("_CRC_class") %>%
-        str_replace_all("_", "\n") -> new_legend
-
-    ggplot(data = data.scores,
-           aes(x = NMDS1, y = NMDS2, fill = parameter_name)) +
-        my_NMDS_theme +
-        scale_fill_manual(name = new_legend, values = reds) +
-        scale_colour_manual(values = reds)
-}
 ```
 
 
