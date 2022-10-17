@@ -334,7 +334,6 @@ That step can take several minutes.
 extract data scores and add stress value:
 
 ```{r}
-stress <- occurrences_t.bray.nmds$stress
 samples <- rownames(eukaryotic_table_transposed_rarefied)
 data.scores <- as.data.frame(vegan::scores(occurrences_t.bray.nmds,
                                            display = "sites"))
@@ -343,7 +342,10 @@ data.scores$samples <- rownames(data.scores)
 x_min <- min(data.scores$NMDS1)
 x_max <- max(data.scores$NMDS1)
 y_max <- max(data.scores$NMDS2)
-stress_annotation <- paste("stress: ", round(stress, digits = 4), sep = "")
+
+occurrences_t.bray.nmds$stress %>%
+    round(., digits = 4) %>%
+    paste("stress: ", ., sep = "") -> stress_annotation
 ```
 
 parse sample names and join metadata:
@@ -438,8 +440,8 @@ ordination_coordinates %>%
 Clean up:
 
 ```{r}
-rm(nmds_plot, occurrences_t.bray.nmds, samples, stress,
-   stress_annotation, nmds_title, x_min, x_max, y_max)
+rm(nmds_plot, occurrences_t.bray.nmds, samples, stress_annotation,
+   nmds_title, x_min, x_max, y_max)
 ```
 
 
@@ -601,7 +603,6 @@ parasitic_table_transposed_rarefied %>%
 extract data scores and add stress value:
 
 ```{r}
-stress <- occurrences_t.bray.nmds$stress
 samples <- rownames(parasitic_table_transposed_rarefied)
 data.scores <- as.data.frame(vegan::scores(occurrences_t.bray.nmds,
                                            display = "sites"))
@@ -610,7 +611,10 @@ data.scores$samples <- rownames(data.scores)
 x_min <- min(data.scores$NMDS1)
 x_max <- max(data.scores$NMDS1)
 y_max <- max(data.scores$NMDS2)
-stress_annotation <- paste("stress: ", round(stress, digits = 4), sep = "")
+
+occurrences_t.bray.nmds$stress %>%
+    round(., digits = 4) %>%
+    paste("stress: ", ., sep = "") -> stress_annotation
 ```
 
 parse sample names and join metadata:
@@ -705,8 +709,8 @@ ordination_coordinates %>%
 Clean up:
 
 ```{r}
-rm(nmds_plot, occurrences_t.bray.nmds, samples, stress,
-   stress_annotation, nmds_title, x_min, x_max, y_max)
+rm(nmds_plot, occurrences_t.bray.nmds, samples, stress_annotation,
+   nmds_title, x_min, x_max, y_max)
 ```
 
 
