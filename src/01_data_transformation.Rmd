@@ -448,8 +448,8 @@ variance in the data is unknown.
 ```{r}
 data.scores %>%
     select(where(is.factor)) %>%
-    map2(.y = names(.),
-         ~ plot_per_parameter(.x, .y))
+    purrr::map2(.y = names(.),
+                ~ plot_per_parameter(.x, .y))
 ```
 
 Clean up:
@@ -663,8 +663,8 @@ variance in the data is unknown.
 ```{r}
 data.scores %>%
     select(where(is.factor)) %>%
-    map2(.y = names(.),
-         ~ plot_per_parameter(.x, .y))
+    purrr::map2(.y = names(.),
+                ~ plot_per_parameter(.x, .y))
 ```
 
 Clean up:
